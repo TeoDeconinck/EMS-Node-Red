@@ -1,9 +1,2024 @@
 [
-  {
-    "id": "ed548bd8.11a048",
-    "type": "server",
-    "z": "",
-    "name": "Home Assistant",
-    "addon": true
-  }
+    {
+        "id": "dc35517772586fa3",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "tab_bronnen",
+        "type": "tab",
+        "label": "0 · Bronnen",
+        "disabled": false,
+        "info": "Afgeleide meetwaarden uit HA-integraties → gepubliceerd als sensor.ems_*",
+        "env": []
+    },
+    {
+        "id": "tab_regels",
+        "type": "tab",
+        "label": "1 · Planner · Regels",
+        "disabled": false,
+        "info": "Planner v1: stap 1/2/2b-logica als blokken → contract sensor.ems_plan_*",
+        "env": []
+    },
+    {
+        "id": "tab_emhass",
+        "type": "tab",
+        "label": "1 · Planner · EMHASS",
+        "disabled": false,
+        "info": "Planner v2 (stap P): EMHASS-aanroepen + mapping naar contract. Leeg tot stap P.",
+        "env": []
+    },
+    {
+        "id": "tab_guard",
+        "type": "tab",
+        "label": "2 · Guardrails",
+        "disabled": false,
+        "info": "Teo's eisen: vloer · avond-reserve · hysterese · piekgrens · schakeltijden · Alfen-minima · OCPP-verbod · handel-slot. Gevuld in N1b.",
+        "env": []
+    },
+    {
+        "id": "tab_act",
+        "type": "tab",
+        "label": "3 · Actuatoren",
+        "disabled": false,
+        "info": "Node-RED → Huawei / Alfen. Gevuld in N1b (Huawei) en N2 (Alfen).",
+        "env": []
+    },
+    {
+        "id": "tab_kpi",
+        "type": "tab",
+        "label": "4 · KPI",
+        "disabled": false,
+        "info": "K1–K9 rekenwerk (stap K1/K2).",
+        "env": []
+    },
+    {
+        "id": "tab_systeem",
+        "type": "tab",
+        "label": "9 · Systeem",
+        "disabled": false,
+        "info": "Heartbeat naar HA (failsafe), pariteitstest, hulpmiddelen.",
+        "env": []
+    },
+    {
+        "id": "sf_hysterese",
+        "type": "subflow",
+        "name": "🔁 Hysterese-latch",
+        "info": "Input: msg.payload = numerieke waarde. Output: msg.payload = true/false, msg.latch = {vorige, drempel}.\nEnv: GRENS (getal of entity-id van een input_number), MARGE (getal of entity-id), RICHTING ('boven' | 'onder').\n'boven': waar als waarde > grens, blijft waar tot waarde <= grens − marge (bv. meepomp-grens).\n'onder': waar zodra waarde < grens − marge, blijft waar tot waarde >= grens (stap-2b-semantiek: netladen-doel, herstel-doel).\nToestand per instantie in node-context (overleeft geen deploy → na deploy start hij op de strenge drempel = veilige kant).",
+        "category": "EMS",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "sf_h_fn"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 420,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "sf_h_fn",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [
+            {
+                "name": "GRENS",
+                "type": "str",
+                "value": "70"
+            },
+            {
+                "name": "MARGE",
+                "type": "str",
+                "value": "input_number.ems_hysterese_marge"
+            },
+            {
+                "name": "RICHTING",
+                "type": "str",
+                "value": "boven"
+            }
+        ],
+        "meta": {},
+        "color": "#DDAA99",
+        "icon": "node-red/switch.svg",
+        "status": {
+            "x": 420,
+            "y": 140,
+            "wires": [
+                {
+                    "id": "sf_h_fn",
+                    "port": 0
+                }
+            ]
+        }
+    },
+    {
+        "id": "sf_schakeltijd",
+        "type": "subflow",
+        "name": "⏱️ Schakeltijd-bewaker",
+        "info": "Laat een gewijzigde msg.payload (setpoint) alleen door als de vorige doorgelaten wijziging ≥ MIN_MINUTEN geleden is.\nOngewijzigde payloads gaan altijd door (output 1). Geblokkeerde wijzigingen → output 2 (met msg.wacht_s).\nEnv: MIN_MINUTEN (getal). Optioneel msg.force = true om te forceren (failsafe).\nGebruik in N1b (batterij-modus ≥ 5 min) en N2 (Alfen stroom ≥ 5 min, start/stop ≥ 10 min: twee instanties in serie).",
+        "category": "EMS",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "sf_s_fn"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 440,
+                "y": 60,
+                "wires": [
+                    {
+                        "id": "sf_s_fn",
+                        "port": 0
+                    }
+                ]
+            },
+            {
+                "x": 440,
+                "y": 120,
+                "wires": [
+                    {
+                        "id": "sf_s_fn",
+                        "port": 1
+                    }
+                ]
+            }
+        ],
+        "env": [
+            {
+                "name": "MIN_MINUTEN",
+                "type": "num",
+                "value": "5"
+            }
+        ],
+        "meta": {},
+        "color": "#DDAA99",
+        "icon": "font-awesome/fa-clock-o",
+        "status": {
+            "x": 440,
+            "y": 180,
+            "wires": [
+                {
+                    "id": "sf_s_fn",
+                    "port": 0
+                }
+            ]
+        }
+    },
+    {
+        "id": "ems_ha_server",
+        "type": "server",
+        "name": "Home Assistant",
+        "addon": true,
+        "rejectUnauthorizedCerts": true,
+        "ha_boolean": [
+            "y",
+            "|",
+            "e",
+            "s",
+            "t",
+            "r",
+            "u",
+            "o",
+            "n",
+            "h",
+            "m",
+            "p"
+        ],
+        "connectionDelay": true,
+        "cacheJson": true,
+        "heartbeat": false,
+        "heartbeatInterval": "30",
+        "areaSelector": "friendlyName",
+        "deviceSelector": "friendlyName",
+        "entitySelector": "friendlyName",
+        "statusSeparator": ": ",
+        "statusYear": "hidden",
+        "statusMonth": "short",
+        "statusDay": "numeric",
+        "statusHourCycle": "default",
+        "statusTimeFormat": "h:m",
+        "enableGlobalContextStore": true
+    },
+    {
+        "id": "ems_device",
+        "type": "ha-device-config",
+        "name": "EMS (Node-RED)",
+        "hwVersion": "",
+        "manufacturer": "Node-RED",
+        "model": "EMS v2",
+        "swVersion": "N1a"
+    },
+    {
+        "id": "cfg0008",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS Node-RED actief",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS Node-RED actief"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:heart-pulse"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0013",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS huisverbruik",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS huisverbruik"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:home-lightning-bolt"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "power"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "W"
+            },
+            {
+                "property": "state_class",
+                "value": "measurement"
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0015",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS netafname",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS netafname"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:transmission-tower-import"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "power"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "W"
+            },
+            {
+                "property": "state_class",
+                "value": "measurement"
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0017",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS zonneoverschot",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS zonneoverschot"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:solar-power"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "power"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "W"
+            },
+            {
+                "property": "state_class",
+                "value": "measurement"
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0019",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS zonvoorspelling vandaag",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS zonvoorspelling vandaag"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:weather-sunny"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "energy"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "kWh"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0021",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS zonvoorspelling rest",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS zonvoorspelling rest"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:weather-sunset"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "energy"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "kWh"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0026",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS prijs nu",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS prijs nu"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:currency-eur"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "€/kWh"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0039",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS plan batterij vermogen",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS plan batterij vermogen"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:battery-charging"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "power"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "W"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0041",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS plan EV stroom",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS plan EV stroom"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:ev-station"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": "current"
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "A"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0043",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS plan bron",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS plan bron"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:source-branch"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": ""
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0045",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS plan kost verwacht",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS plan kost verwacht"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:cash-clock"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "€"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0048",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS NR netladen gewenst",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS NR netladen gewenst"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:transmission-tower-import"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0050",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS NR batterij assist toegestaan",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS NR batterij assist toegestaan"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:battery-arrow-up"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0052",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS NR goedkoopste uren",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS NR goedkoopste uren"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:clock-check-outline"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0054",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS NR herstel nodig",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS NR herstel nodig"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:battery-clock"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0056",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS NR EV doelstroom",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS NR EV doelstroom"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:ev-station"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": "A"
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0063",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS pariteit afwijkingen",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS pariteit afwijkingen"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:compare-horizontal"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": ""
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "sf_h_fn",
+        "type": "function",
+        "z": "sf_hysterese",
+        "name": "latch",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\nconst val = s => { const v = parseFloat(s); return Number.isFinite(v) ? v : lib.num(st, String(s), 0); };\nconst grens = val(env.get('GRENS')), marge = val(env.get('MARGE')), richting = env.get('RICHTING') || 'boven';\nconst vorige = context.get('aan') || false;\nconst waarde = parseFloat(msg.payload);\nif (!Number.isFinite(waarde)) { node.status({ fill: 'red', shape: 'ring', text: 'geen getal' }); return null; }\nconst aan = lib.latch(waarde, grens, marge, richting, vorige);\ncontext.set('aan', aan);\nmsg.latch = { vorige, grens, marge, richting, waarde };\nmsg.payload = aan;\nnode.status({ fill: aan ? 'green' : 'grey', shape: 'dot', text: `${waarde} ${richting} ${grens}±${marge} → ${aan}` });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 240,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sf_s_fn",
+        "type": "function",
+        "z": "sf_schakeltijd",
+        "name": "bewaker",
+        "func": "const min_ms = (Number(env.get('MIN_MINUTEN')) || 5) * 60e3;\nconst now = Date.now();\nconst laatste = context.get('laatste');   // { waarde, t }\nconst nieuw = msg.payload;\nif (laatste && laatste.waarde === nieuw) { node.status({ fill: 'grey', shape: 'dot', text: `ongewijzigd (${nieuw})` }); return [msg, null]; }\nif (!msg.force && laatste && now - laatste.t < min_ms) {\n  msg.wacht_s = Math.ceil((min_ms - (now - laatste.t)) / 1000);\n  node.status({ fill: 'yellow', shape: 'ring', text: `wacht ${msg.wacht_s}s (${laatste.waarde}→${nieuw})` });\n  return [null, msg];\n}\ncontext.set('laatste', { waarde: nieuw, t: now });\nnode.status({ fill: 'green', shape: 'dot', text: `→ ${nieuw}` });\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 250,
+        "y": 80,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "cm0010",
+        "type": "comment",
+        "z": "tab_bronnen",
+        "name": "0 · Bronnen — afgeleide meetwaarden",
+        "info": "Port van de HA-templates van 13/08 (ems-helpers-config.md §2). Elke 60 s. Bron voor netvermogen = sensor.elektriciteitsmeter_vermogen (DTSU — vervuild tot stap M; daarna hier de P1-entiteit invullen: één plek).",
+        "x": 150,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "inj0011",
+        "type": "inject",
+        "z": "tab_bronnen",
+        "name": "elke 60 s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "60",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "8",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 120,
+        "wires": [
+            [
+                "fn0012"
+            ]
+        ]
+    },
+    {
+        "id": "fn0012",
+        "type": "function",
+        "z": "tab_bronnen",
+        "name": "🧮 afgeleide vermogens + zon",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\n// ---- BRON-ENTITEITEN (één plek om te wisselen na de meterfix / P1) ----\nconst SRC = {\n  omvormer_ac:   'sensor.omvormer_werkelijk_vermogen',      // Huawei, W (+ = levert)\n  net_vermogen:  'sensor.elektriciteitsmeter_vermogen',      // Huawei/DTSU, W (+ = afname, − = injectie)  → later P1\n  pv_vandaag:    ['sensor.energy_production_today_3', 'sensor.energy_production_today_4'],\n  pv_rest:       ['sensor.energy_production_today_remaining_3', 'sensor.energy_production_today_remaining_4'],\n};\nconst omv = lib.num(st, SRC.omvormer_ac, 0);\nconst net = lib.num(st, SRC.net_vermogen, 0);\nconst som = ids => ids.reduce((a, id) => a + lib.num(st, id, 0), 0);\nconst b = {\n  huisverbruik: Math.round(omv + net),\n  netafname:    Math.round(Math.max(net, 0)),\n  zonneoverschot: Math.round(Math.max(-net, 0)),\n  zonvoorspelling_vandaag: Math.round(som(SRC.pv_vandaag) * 10) / 10,\n  zonvoorspelling_rest:    Math.round(som(SRC.pv_rest) * 10) / 10,\n};\nflow.set('bronnen', b);           // voor de planner-tab (via global hieronder)\nglobal.set('ems_bronnen', b);\nmsg.bron = b;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 120,
+        "wires": [
+            [
+                "sen0014",
+                "sen0016",
+                "sen0018",
+                "sen0020",
+                "sen0022"
+            ]
+        ]
+    },
+    {
+        "id": "sen0014",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS huisverbruik",
+        "entityConfig": "cfg0013",
+        "version": 0,
+        "state": "bron.huisverbruik",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0016",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS netafname",
+        "entityConfig": "cfg0015",
+        "version": 0,
+        "state": "bron.netafname",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0018",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS zonneoverschot",
+        "entityConfig": "cfg0017",
+        "version": 0,
+        "state": "bron.zonneoverschot",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0020",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS zonvoorspelling vandaag",
+        "entityConfig": "cfg0019",
+        "version": 0,
+        "state": "bron.zonvoorspelling_vandaag",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 260,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0022",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS zonvoorspelling rest",
+        "entityConfig": "cfg0021",
+        "version": 0,
+        "state": "bron.zonvoorspelling_rest",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 320,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0023",
+        "type": "comment",
+        "z": "tab_bronnen",
+        "name": "💶 Prijzen",
+        "info": "Prijs-array (today/tomorrow, veld all_in) genormaliseerd naar slots en in global.ems_prijs gezet. Bij de contractwissel (stap C) alleen PRIJS_SENSOR hier aanpassen.",
+        "x": 150,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "inj0024",
+        "type": "inject",
+        "z": "tab_bronnen",
+        "name": "elke 5 min",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "9",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 480,
+        "wires": [
+            [
+                "fn0025"
+            ]
+        ]
+    },
+    {
+        "id": "fn0025",
+        "type": "function",
+        "z": "tab_bronnen",
+        "name": "🧮 prijs-slots normaliseren",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\nconst PRIJS_SENSOR = 'sensor.engie_engie_flow_flanders_huidige_prijs';   // ← stap C: dynamisch device\nconst slots = lib.prijsSlots(st, PRIJS_SENSOR);\nglobal.set('ems_prijs', { sensor: PRIJS_SENSOR, slots: slots.map(s => ({ start: s.start.toISOString(), end: s.end.toISOString(), prijs: s.prijs })) });\nconst nu = new Date(); const cur = slots.find(s => nu >= s.start && nu < s.end);\nconst vandaag = slots.filter(s => s.start.toDateString() === nu.toDateString()).map(s => s.prijs);\nmsg.payload = cur ? cur.prijs : null;\nmsg.prijs = { n_slots: slots.length, min_vandaag: Math.min(...vandaag), max_vandaag: Math.max(...vandaag),\n              gem_vandaag: vandaag.length ? vandaag.reduce((a, b) => a + b, 0) / vandaag.length : null };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 480,
+        "wires": [
+            [
+                "sen0027"
+            ]
+        ]
+    },
+    {
+        "id": "sen0027",
+        "type": "ha-sensor",
+        "z": "tab_bronnen",
+        "name": "EMS prijs nu",
+        "entityConfig": "cfg0026",
+        "version": 0,
+        "state": "payload",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "min_vandaag",
+                "value": "prijs.min_vandaag",
+                "valueType": "msg"
+            },
+            {
+                "property": "max_vandaag",
+                "value": "prijs.max_vandaag",
+                "valueType": "msg"
+            },
+            {
+                "property": "gem_vandaag",
+                "value": "prijs.gem_vandaag",
+                "valueType": "msg"
+            },
+            {
+                "property": "n_slots",
+                "value": "prijs.n_slots",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 760,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0028",
+        "type": "comment",
+        "z": "tab_regels",
+        "name": "1 · Planner · Regels (v1) — port van stap 1/2/2b",
+        "info": "Elke 5 min (EV-doelstroom elke 1 min). Eén msg loopt door de blokken; elk blok schrijft in msg.ems en leest de vorige uitkomst voor hysterese uit flow-context. Bron van waarheid: ems-stap1-prijssturing.md, ems-stap2-batterijregels-ev.md, ems-stap2b-hysterese-patch.md.",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "inj0029",
+        "type": "inject",
+        "z": "tab_regels",
+        "name": "elke 5 min",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "12",
+        "topic": "5min",
+        "payload": "",
+        "payloadType": "date",
+        "x": 120,
+        "y": 120,
+        "wires": [
+            [
+                "fn0031"
+            ]
+        ]
+    },
+    {
+        "id": "inj0030",
+        "type": "inject",
+        "z": "tab_regels",
+        "name": "elke 1 min (EV)",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "60",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "15",
+        "topic": "1min",
+        "payload": "",
+        "payloadType": "date",
+        "x": 120,
+        "y": 180,
+        "wires": [
+            [
+                "fn0031"
+            ]
+        ]
+    },
+    {
+        "id": "fn0031",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "① context inlezen",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\nconst nu = new Date();\nconst e = {\n  nu, tick: msg.topic,\n  soc: lib.num(st, 'sensor.batterijen_batterijpercentage', 100),\n  vloer: lib.num(st, 'input_number.batterij_vloer', 40),\n  herstel_doel: lib.num(st, 'input_number.batterij_herstel_doel', 70),\n  meepomp_grens: lib.num(st, 'input_number.batterij_meepomp_grens', 70),\n  netladen_doel: lib.num(st, 'input_number.ems_netladen_doel', 90),\n  laaduren: Math.round(lib.num(st, 'input_number.ems_laaduren', 4)),\n  marge: lib.num(st, 'input_number.ems_hysterese_marge', 5),\n  zonnedag_drempel: lib.num(st, 'input_number.goede_zonnedag_drempel', 18),\n  deadline: lib.todayAt(lib.str(st, 'input_datetime.herstel_deadline', '15:00:00'), nu),\n  avond: lib.todayAt(lib.str(st, 'input_datetime.avond_reserve_tijd', '19:00:00'), nu),\n  t_prijssturing: lib.on(st, 'input_boolean.ems_prijssturing'),\n  t_herstelregel: lib.on(st, 'input_boolean.ems_herstelregel'),\n  t_herstel_ook_zon: lib.on(st, 'input_boolean.ems_herstel_ook_op_zonnedag'),\n  ev_modus: lib.str(st, 'input_select.ems_ev_laadmodus', 'Uit'),\n  ev_max_a: lib.num(st, 'input_number.ems_ev_max_stroom', 16),\n  assist_w: lib.num(st, 'input_number.ems_batterij_assist_vermogen', 2000),\n  batterij_modus: lib.str(st, 'input_select.batterij_modus', 'Auto'),\n  planner_bron: lib.str(st, 'input_select.ems_planner_bron', 'Regels'),\n};\nconst bron = global.get('ems_bronnen') || {};\ne.zonneoverschot = bron.zonneoverschot ?? 0;\ne.zonvoorspelling_vandaag = bron.zonvoorspelling_vandaag ?? 0;\nconst pr = global.get('ems_prijs') || { slots: [] };\ne.slots = pr.slots.map(s => ({ start: new Date(s.start), end: new Date(s.end), prijs: s.prijs }));\n// afgeleide basisbooleans (port van 13/08-templates)\ne.boven_vloer = e.soc > e.vloer;\ne.goede_zonnedag = e.zonvoorspelling_vandaag >= e.zonnedag_drempel;\nmsg.ems = e; msg.prev = flow.get('planner_prev') || {};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 150,
+        "wires": [
+            [
+                "fn0032"
+            ]
+        ]
+    },
+    {
+        "id": "fn0032",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "② goedkoopste uren (stap 1)",
+        "func": "const lib = global.get('ems_lib'); const e = msg.ems;\nconst van = new Date(e.nu); van.setHours(0, 0, 0, 0);\nconst tot = new Date(van); tot.setDate(tot.getDate() + 1);\nconst g = lib.goedkoopsteUren(e.slots, e.laaduren, van, tot, e.nu);\ne.goedkoopste_uren = g.is_now; e.blokken = g.blokken;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 150,
+        "wires": [
+            [
+                "fn0033"
+            ]
+        ]
+    },
+    {
+        "id": "fn0033",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "③ herstel (stap 2 + 2b)",
+        "func": "const lib = global.get('ems_lib'); const e = msg.ems; const prev = msg.prev;\n// uren nodig: tekort × 15 kWh ÷ 5 kW, cap 6\nconst tekort = Math.max(e.herstel_doel - e.soc, 0);\ne.herstel_uren = Math.min(Math.ceil(tekort / 100 * 15 / 5), 6);\nconst voor_deadline = e.nu < e.deadline;\nconst zonnedag_ok = !e.goede_zonnedag || e.t_herstel_ook_zon;\n// hysterese (2b): nodig onder doel − marge, blijft nodig tot doel bereikt\nconst soc_ok = lib.latch(e.soc, e.herstel_doel, e.marge, 'onder', !!prev.herstel_nodig);\ne.herstel_nodig = soc_ok && voor_deadline && zonnedag_ok;\n// laadvenster: goedkoopste resterende uren vóór de deadline (look_ahead + end)\nif (e.herstel_nodig) {\n  const g = lib.goedkoopsteUren(e.slots, Math.max(e.herstel_uren, 1), e.nu, e.deadline, e.nu);\n  // look_ahead: het lopende slot telt mee als het nog niet voorbij is\n  const lopend = e.slots.find(s => e.nu >= s.start && e.nu < s.end);\n  const g2 = lopend ? lib.goedkoopsteUren(e.slots, Math.max(e.herstel_uren, 1), lopend.start, e.deadline, e.nu) : g;\n  e.herstel_venster = g2.is_now; e.herstel_blokken = g2.blokken;\n} else { e.herstel_venster = false; e.herstel_blokken = []; }\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 210,
+        "wires": [
+            [
+                "fn0034"
+            ]
+        ]
+    },
+    {
+        "id": "fn0034",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "④ netladen-beslissing (stap 2b)",
+        "func": "const lib = global.get('ems_lib'); const e = msg.ems; const prev = msg.prev;\nconst soc_ok = lib.latch(e.soc, e.netladen_doel, e.marge, 'onder', !!prev.netladen_gewenst);\nconst prijs = e.t_prijssturing && e.goedkoopste_uren && soc_ok;\nconst herstel = e.t_herstelregel && e.herstel_nodig && e.herstel_venster;\ne.netladen_gewenst = prijs || herstel;\ne.netladen_reden = prijs && herstel ? 'prijssturing + herstel' : prijs ? 'prijssturing' : herstel ? 'herstel' : 'geen';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 270,
+        "wires": [
+            [
+                "fn0035"
+            ]
+        ]
+    },
+    {
+        "id": "fn0035",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "⑤ drie-fasen batterij→EV (stap 2 + 2b)",
+        "func": "const lib = global.get('ems_lib'); const e = msg.ems; const prev = msg.prev;\ne.fase = e.nu < e.deadline ? 1 : e.nu < e.avond ? 2 : 3;\ne.fase_tekst = { 1: '1 — herstel-fase (geen batterij→EV)', 2: '2 — dag-fase (batterij→EV boven meepomp-grens)', 3: '3 — avond-fase (geen batterij→EV)' }[e.fase];\nconst soc_ok = lib.latch(e.soc, e.meepomp_grens, e.marge, 'boven', !!prev.assist_toegestaan);\ne.assist_toegestaan = e.boven_vloer && e.fase === 2 && soc_ok;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 330,
+        "wires": [
+            [
+                "fn0036"
+            ]
+        ]
+    },
+    {
+        "id": "fn0036",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "⑥ EV-doelstroom (stap 2)",
+        "func": "const e = msg.ems;\nconst SPANNING = 230;               // 1-fase-aansluiting bevestigd 10/09 (Alfen 1F, max ~7 kW)\nconst assist = e.assist_toegestaan ? e.assist_w : 0;\nlet a = 0;\nif (e.ev_modus === 'Volle kracht') a = Math.round(e.ev_max_a);\nelse if (e.ev_modus === 'Zon-overschot') { const x = e.zonneoverschot / SPANNING; a = x < 6 ? 0 : Math.round(Math.min(x, e.ev_max_a)); }\nelse if (e.ev_modus === 'Zon + batterij') { const x = (e.zonneoverschot + assist) / SPANNING; a = x < 6 ? 0 : Math.round(Math.min(x, e.ev_max_a)); }\ne.ev_doelstroom = a;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 390,
+        "wires": [
+            [
+                "fn0037"
+            ]
+        ]
+    },
+    {
+        "id": "fn0037",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "⑦ contract-mapping → ems_plan_*",
+        "func": "const e = msg.ems;\n// Batterijvermogen: + laden (net toegestaan) / − ontladen (assist naar EV) / 0 = auto (zelfconsumptie)\nlet batt_w = 0, modus = 'auto', reden = 'zelfconsumptie';\nif (e.netladen_gewenst)        { batt_w = 5000;  modus = 'laden';    reden = 'netladen: ' + e.netladen_reden; }\nelse if (e.assist_toegestaan && e.ev_modus === 'Zon + batterij' && e.ev_doelstroom > 0)\n                               { batt_w = -e.assist_w; modus = 'ontladen'; reden = 'batterij→EV, ' + e.fase_tekst; }\nelse                           { reden = 'auto — ' + e.fase_tekst; }\n// horizon: gekozen laadblokken + herstelblokken als slots\nconst horizon = [...(e.blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: 5000, ev_A: 0, prijs: b.gem, bron: 'prijssturing' })),\n                 ...(e.herstel_blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: 5000, ev_A: 0, prijs: b.gem, bron: 'herstel' }))]\n                .sort((x, y) => new Date(x.start) - new Date(y.start));\n// verwachte kost van het plan (alleen netladen-slots, 5 kW × uren × prijs) — K9-basis\nconst kost = horizon.reduce((s, h) => s + 5 * ((new Date(h.end) - new Date(h.start)) / 3600e3) * (h.prijs || 0), 0);\nmsg.plan = {\n  batterij_vermogen: batt_w, modus, reden, horizon, kost_verwacht: Math.round(kost * 100) / 100,\n  ev_stroom: e.ev_doelstroom, bron: 'regels',\n  // pariteit / debug\n  netladen_gewenst: e.netladen_gewenst, netladen_reden: e.netladen_reden,\n  assist_toegestaan: e.assist_toegestaan, fase_tekst: e.fase_tekst,\n  herstel_nodig: e.herstel_nodig, herstel_uren: e.herstel_uren, herstel_venster: e.herstel_venster,\n  goedkoopste_uren: e.goedkoopste_uren, blokken: e.blokken, soc: e.soc,\n};\nflow.set('planner_prev', { herstel_nodig: e.herstel_nodig, netladen_gewenst: e.netladen_gewenst, assist_toegestaan: e.assist_toegestaan });\nglobal.set('ems_plan_regels', msg.plan);\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 6,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 450,
+        "wires": [
+            [
+                "fn0038"
+            ]
+        ]
+    },
+    {
+        "id": "fn0038",
+        "type": "function",
+        "z": "tab_regels",
+        "name": "⑧ planner-bron = Regels/Vergelijk?",
+        "func": "const bron = msg.ems.planner_bron;\nif (bron === 'EMHASS') { node.status({ fill: 'grey', shape: 'ring', text: 'EMHASS vult contract' }); return [null, msg]; }\nnode.status({ fill: 'green', shape: 'dot', text: `regels → contract (${msg.plan.modus}, EV ${msg.plan.ev_stroom} A)` });\nreturn [msg, msg];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 660,
+        "y": 530,
+        "wires": [
+            [
+                "sen0040",
+                "sen0042",
+                "sen0044",
+                "sen0046"
+            ],
+            [
+                "bse0049",
+                "bse0051",
+                "bse0053",
+                "bse0055",
+                "sen0057",
+                "dbg0058"
+            ]
+        ]
+    },
+    {
+        "id": "sen0040",
+        "type": "ha-sensor",
+        "z": "tab_regels",
+        "name": "EMS plan batterij vermogen",
+        "entityConfig": "cfg0039",
+        "version": 0,
+        "state": "plan.batterij_vermogen",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "modus",
+                "value": "plan.modus",
+                "valueType": "msg"
+            },
+            {
+                "property": "reden",
+                "value": "plan.reden",
+                "valueType": "msg"
+            },
+            {
+                "property": "horizon",
+                "value": "plan.horizon",
+                "valueType": "msg"
+            },
+            {
+                "property": "bron",
+                "value": "plan.bron",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0042",
+        "type": "ha-sensor",
+        "z": "tab_regels",
+        "name": "EMS plan EV stroom",
+        "entityConfig": "cfg0041",
+        "version": 0,
+        "state": "plan.ev_stroom",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "fase",
+                "value": "plan.fase_tekst",
+                "valueType": "msg"
+            },
+            {
+                "property": "assist",
+                "value": "plan.assist_toegestaan",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0044",
+        "type": "ha-sensor",
+        "z": "tab_regels",
+        "name": "EMS plan bron",
+        "entityConfig": "cfg0043",
+        "version": 0,
+        "state": "plan.bron",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0046",
+        "type": "ha-sensor",
+        "z": "tab_regels",
+        "name": "EMS plan kost verwacht",
+        "entityConfig": "cfg0045",
+        "version": 0,
+        "state": "plan.kost_verwacht",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1050,
+        "y": 680,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0047",
+        "type": "comment",
+        "z": "tab_regels",
+        "name": "🔬 Pariteitstest-sensoren (ems_nr_*)",
+        "info": "Deze spiegelen de HA-templates 1-op-1 zodat je ze een week naast elkaar kunt leggen. Na pariteit (N1b) verdwijnen de HA-templates; deze sensoren mogen dan blijven als 'waarom'-bron voor het dashboard.",
+        "x": 1060,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "bse0049",
+        "type": "ha-binary-sensor",
+        "z": "tab_regels",
+        "name": "EMS NR netladen gewenst",
+        "entityConfig": "cfg0048",
+        "version": 0,
+        "state": "plan.netladen_gewenst",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "reden",
+                "value": "plan.netladen_reden",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "bse0051",
+        "type": "ha-binary-sensor",
+        "z": "tab_regels",
+        "name": "EMS NR batterij assist toegestaan",
+        "entityConfig": "cfg0050",
+        "version": 0,
+        "state": "plan.assist_toegestaan",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "fase",
+                "value": "plan.fase_tekst",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 160,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "bse0053",
+        "type": "ha-binary-sensor",
+        "z": "tab_regels",
+        "name": "EMS NR goedkoopste uren",
+        "entityConfig": "cfg0052",
+        "version": 0,
+        "state": "plan.goedkoopste_uren",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "blokken",
+                "value": "plan.blokken",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 220,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "bse0055",
+        "type": "ha-binary-sensor",
+        "z": "tab_regels",
+        "name": "EMS NR herstel nodig",
+        "entityConfig": "cfg0054",
+        "version": 0,
+        "state": "plan.herstel_nodig",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "uren",
+                "value": "plan.herstel_uren",
+                "valueType": "msg"
+            },
+            {
+                "property": "venster",
+                "value": "plan.herstel_venster",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sen0057",
+        "type": "ha-sensor",
+        "z": "tab_regels",
+        "name": "EMS NR EV doelstroom",
+        "entityConfig": "cfg0056",
+        "version": 0,
+        "state": "plan.ev_stroom",
+        "stateType": "msg",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1040,
+        "y": 340,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "dbg0058",
+        "type": "debug",
+        "z": "tab_regels",
+        "name": "plan",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "plan",
+        "targetType": "msg",
+        "statusVal": "plan",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "cm0068",
+        "type": "comment",
+        "z": "tab_emhass",
+        "name": "Planner · EMHASS — stap P",
+        "info": "Node-RED roept dayahead-optim (~13:30) en naive-mpc-optim (elk kwartier) + publish-data; mapping p_batt_forecast (teken omdraaien) → ems_plan_batterij_vermogen, p_deferrable0 ÷ 230 → ems_plan_ev_stroom, total_cost_fun_value → ems_plan_kost_verwacht. Actief zodra input_select.ems_planner_bron = EMHASS of Vergelijk (shadow).",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "cm0065",
+        "type": "comment",
+        "z": "tab_guard",
+        "name": "Guardrails — gevuld in N1b",
+        "info": "Volgorde (elke stap perkt alleen in): 1 vloer · 2 avond-reserve · 3 hysterese (subflow) · 4 piekgrens ems_piekgrens_kw · 5 min. schakeltijd batterij (subflow, 5 min) · 6 Alfen start/stop-minima (N2) · 7 OCPP-verbod · 8 handel-slot. Input = sensor.ems_plan_* ; output = veilig setpoint → tab Actuatoren.",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "sfi0066",
+        "type": "subflow:sf_hysterese",
+        "z": "tab_guard",
+        "name": "voorbeeld: SOC boven meepomp-grens",
+        "env": [
+            {
+                "name": "GRENS",
+                "value": "input_number.batterij_meepomp_grens",
+                "type": "str"
+            },
+            {
+                "name": "RICHTING",
+                "value": "boven",
+                "type": "str"
+            }
+        ],
+        "x": 380,
+        "y": 120,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "sfi0067",
+        "type": "subflow:sf_schakeltijd",
+        "z": "tab_guard",
+        "name": "voorbeeld: batterij-modus ≥ 5 min",
+        "x": 380,
+        "y": 180,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "cm0069",
+        "type": "comment",
+        "z": "tab_act",
+        "name": "Actuatoren — N1b (Huawei) en N2 (Alfen)",
+        "info": "Huawei: input_select.batterij_modus (→ bestaande bewaker) / switch.batterijen_laden_van_stroomnet, number.batterijen_maximaal_laadvermogen / _ontlaadvermogen, huawei_solar.forcible_charge/discharge. Alfen: ALLEEN number.laadpaal_max_station_current (guardrail 7). Alles achter input_boolean.ems_nodered_stuurt.",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "cm0070",
+        "type": "comment",
+        "z": "tab_kpi",
+        "name": "KPI — stap K1/K2",
+        "info": "K1 netkost · K2/K3 prijs-index · K4 EMS-winst vs naïeve baseline · K5 contractwinst · K6 cycluswinst · K7 zelfconsumptie/autarkie · K8 maandpiek · K9 plan-kwaliteit (ems_plan_kost_verwacht vs gerealiseerd). Meetwaarheid = P1 (stap M).",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "cm0001",
+        "type": "comment",
+        "z": "tab_systeem",
+        "name": "📚 Bibliotheek",
+        "info": "Deze function-node laadt bij deploy de gedeelde EMS-functies in global.ems_lib (prijs-slots, goedkoopste uren, hysterese-latch, HA-state-helpers). Alle andere function-nodes gebruiken: const lib = global.get('ems_lib');",
+        "x": 120,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "inj0002",
+        "type": "inject",
+        "z": "tab_systeem",
+        "name": "bij deploy",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "0.5",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 100,
+        "wires": [
+            [
+                "fn0003"
+            ]
+        ]
+    },
+    {
+        "id": "fn0003",
+        "type": "function",
+        "z": "tab_systeem",
+        "name": "📚 EMS-bibliotheek laden",
+        "func": "// ==== EMS-bibliotheek (geladen in global.ems_lib) ====\nconst lib = {};\nlib.states = function () {\n  const g = global.get('homeassistant') || {};\n  const srv = g.homeAssistant || Object.values(g)[0];\n  if (!srv || !srv.states) throw new Error('HA global context store niet beschikbaar — zet \"Enable global context store\" aan op de server-node');\n  return srv.states;\n};\nlib.num = function (st, id, dflt) {\n  const e = st[id]; if (!e) return dflt;\n  const v = parseFloat(e.state); return Number.isFinite(v) ? v : dflt;\n};\nlib.str = function (st, id, dflt) { const e = st[id]; return e ? e.state : dflt; };\nlib.on  = function (st, id) { const e = st[id]; return !!e && e.state === 'on'; };\nlib.attr = function (st, id, a, dflt) { const e = st[id]; return e && e.attributes && e.attributes[a] !== undefined ? e.attributes[a] : dflt; };\n// 'HH:MM:SS' van een input_datetime → Date van vandaag\nlib.todayAt = function (hhmm, now) {\n  const [h, m] = String(hhmm || '00:00').split(':').map(Number);\n  const d = new Date(now || Date.now()); d.setHours(h || 0, m || 0, 0, 0); return d;\n};\n// prijs-array normaliseren: [{start:Date, end:Date, prijs:Number}]\nlib.prijsSlots = function (st, sensorId) {\n  const e = st[sensorId]; if (!e) return [];\n  const a = e.attributes || {};\n  const raw = [...(a.today || []), ...(a.tomorrow || [])];\n  const out = raw.map(h => ({ start: new Date(h.start), end: h.end ? new Date(h.end) : null, prijs: Number(h.all_in) }))\n                 .filter(s => !isNaN(s.start) && Number.isFinite(s.prijs))\n                 .sort((x, y) => x.start - y.start);\n  for (let i = 0; i < out.length; i++) if (!out[i].end) out[i].end = i + 1 < out.length ? out[i + 1].start : new Date(out[i].start.getTime() + 3600e3);\n  return out;\n};\n// Goedkoopste N uren (split toegestaan) binnen [van, tot) — port van cheapest_energy_hours(split=true)\nlib.goedkoopsteUren = function (slots, n, van, tot, now) {\n  const kand = slots.filter(s => s.start >= van && s.end <= tot);\n  const gekozen = [...kand].sort((a, b) => a.prijs - b.prijs || a.start - b.start).slice(0, Math.max(0, n))\n                           .sort((a, b) => a.start - b.start);\n  // aaneengesloten slots samenvoegen tot blokken (zoals attribute 'blokken')\n  const blokken = [];\n  for (const s of gekozen) {\n    const last = blokken[blokken.length - 1];\n    if (last && last.end.getTime() === s.start.getTime()) { last.end = s.end; last.prices.push(s.prijs); }\n    else blokken.push({ start: s.start, end: s.end, prices: [s.prijs] });\n  }\n  const nu = now || new Date();\n  const is_now = gekozen.some(s => nu >= s.start && nu < s.end);\n  return { is_now, blokken: blokken.map(b => ({ start: b.start.toISOString(), end: b.end.toISOString(),\n           prices: b.prices, gem: b.prices.reduce((x, y) => x + y, 0) / b.prices.length })), n_gevonden: gekozen.length };\n};\n// Hysterese-latch: aan bij >grens (of <grens), pas uit bij grens∓marge. state = vorige uitkomst (bool)\nlib.latch = function (waarde, grens, marge, richting, vorige) {\n  // richting 'boven': waar als waarde > grens; blijft waar tot waarde <= grens - marge\n  // richting 'onder': waar als waarde < grens; blijft waar tot waarde >= grens + marge\n  if (richting === 'boven') return vorige ? waarde > grens - marge : waarde > grens;\n  return vorige ? waarde < grens : waarde < grens - marge; // 'onder' = stap-2b-semantiek (start onder doel − marge, door tot doel)\n};\nglobal.set('ems_lib', lib);\nreturn {};",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0004",
+        "type": "comment",
+        "z": "tab_systeem",
+        "name": "💓 Heartbeat → HA-failsafe",
+        "info": "Elke minuut wordt input_datetime.ems_heartbeat op 'nu' gezet. De HA-automatisering \"EMS — failsafe\" grijpt in als dit >10 min uitblijft (Node-RED dood / add-on gestopt / HA-verbinding weg).",
+        "x": 120,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "inj0005",
+        "type": "inject",
+        "z": "tab_systeem",
+        "name": "elke 60 s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "60",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "5",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 240,
+        "wires": [
+            [
+                "fn0006",
+                "bse0009"
+            ]
+        ]
+    },
+    {
+        "id": "fn0006",
+        "type": "function",
+        "z": "tab_systeem",
+        "name": "payload = set_datetime(nu)",
+        "func": "const d = new Date();\nconst p = n => String(n).padStart(2, '0');\nconst lokaal = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;\nmsg.payload = {\n  action: 'input_datetime.set_datetime',\n  domain: 'input_datetime', service: 'set_datetime',\n  target: { entity_id: ['input_datetime.ems_heartbeat'] },\n  data: { datetime: lokaal }\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 240,
+        "wires": [
+            [
+                "svc0007"
+            ]
+        ]
+    },
+    {
+        "id": "svc0007",
+        "type": "api-call-service",
+        "z": "tab_systeem",
+        "name": "input_datetime.set_datetime",
+        "server": "ems_ha_server",
+        "version": 7,
+        "debugenabled": false,
+        "action": "",
+        "floorId": [],
+        "areaId": [],
+        "deviceId": [],
+        "entityId": [],
+        "labelId": [],
+        "data": "",
+        "dataType": "jsonata",
+        "mergeContext": "",
+        "outputProperties": [],
+        "queue": "none",
+        "blockInputOverrides": false,
+        "domain": "",
+        "service": "",
+        "x": 640,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "bse0009",
+        "type": "ha-binary-sensor",
+        "z": "tab_systeem",
+        "name": "EMS Node-RED actief",
+        "entityConfig": "cfg0008",
+        "version": 0,
+        "state": "true",
+        "stateType": "jsonata",
+        "attributes": [],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 640,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0059",
+        "type": "comment",
+        "z": "tab_systeem",
+        "name": "🔬 Pariteitstest — Node-RED vs HA-templates",
+        "info": "Elke 5 min (30 s na de planner) vergelijkt deze flow de ems_nr_*-uitkomsten met de HA-templates. Afwijkingen worden geteld en gelogd in sensor.ems_pariteit_afwijkingen (attribute 'laatste'). Reset: 'teller resetten'.",
+        "x": 120,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "inj0060",
+        "type": "inject",
+        "z": "tab_systeem",
+        "name": "elke 5 min",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "45",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 440,
+        "wires": [
+            [
+                "fn0062"
+            ]
+        ]
+    },
+    {
+        "id": "inj0061",
+        "type": "inject",
+        "z": "tab_systeem",
+        "name": "teller resetten",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "10",
+        "topic": "reset",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 500,
+        "wires": [
+            [
+                "fn0062"
+            ]
+        ]
+    },
+    {
+        "id": "fn0062",
+        "type": "function",
+        "z": "tab_systeem",
+        "name": "vergelijk NR ↔ HA",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\nif (msg.topic === 'reset') { flow.set('pariteit', { n: 0, afw: 0, laatste: [] }); }\nconst p = global.get('ems_plan_regels'); if (!p) return null;\nconst ctx = flow.get('pariteit') || { n: 0, afw: 0, laatste: [] };\nconst checks = [\n  ['netladen_gewenst', p.netladen_gewenst, lib.on(st, 'binary_sensor.ems_netladen_gewenst')],\n  ['assist_toegestaan', p.assist_toegestaan, lib.on(st, 'binary_sensor.ems_batterij_assist_toegestaan')],\n  ['goedkoopste_uren', p.goedkoopste_uren, lib.on(st, 'binary_sensor.ems_goedkoopste_uren')],\n  ['herstel_nodig', p.herstel_nodig, lib.on(st, 'binary_sensor.ems_herstel_nodig')],\n  ['ev_doelstroom', p.ev_stroom, lib.num(st, 'sensor.ems_ev_doelstroom', -1)],\n];\nconst afw = checks.filter(([, nr, ha]) => nr !== ha).map(([k, nr, ha]) => `${k}: NR=${nr} HA=${ha}`);\nctx.n += 1;\nif (afw.length) { ctx.afw += 1; ctx.laatste = [new Date().toLocaleString('nl-BE') + ' · ' + afw.join(' | '), ...ctx.laatste].slice(0, 20); }\nflow.set('pariteit', ctx);\nmsg.payload = ctx.afw; msg.par = { n: ctx.n, laatste: ctx.laatste, ok_pct: ctx.n ? Math.round((1 - ctx.afw / ctx.n) * 1000) / 10 : null };\nnode.status({ fill: afw.length ? 'yellow' : 'green', shape: 'dot', text: `${ctx.afw}/${ctx.n} afwijkend` });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 470,
+        "wires": [
+            [
+                "sen0064"
+            ]
+        ]
+    },
+    {
+        "id": "sen0064",
+        "type": "ha-sensor",
+        "z": "tab_systeem",
+        "name": "EMS pariteit afwijkingen",
+        "entityConfig": "cfg0063",
+        "version": 0,
+        "state": "payload",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "checks",
+                "value": "par.n",
+                "valueType": "msg"
+            },
+            {
+                "property": "ok_pct",
+                "value": "par.ok_pct",
+                "valueType": "msg"
+            },
+            {
+                "property": "laatste",
+                "value": "par.laatste",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 660,
+        "y": 470,
+        "wires": [
+            []
+        ]
+    }
 ]
