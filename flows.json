@@ -1691,11 +1691,6 @@
                 "name": "GRENS",
                 "value": "input_number.batterij_meepomp_grens",
                 "type": "str"
-            },
-            {
-                "name": "RICHTING",
-                "value": "boven",
-                "type": "str"
             }
         ],
         "x": 380,
