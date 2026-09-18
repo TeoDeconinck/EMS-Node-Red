@@ -32,19 +32,19 @@
         "env": []
     },
     {
-        "id": "tab_guard",
+        "id": "tab_guard_n1b",
         "type": "tab",
         "label": "2 · Guardrails",
         "disabled": false,
-        "info": "Teo's eisen: vloer · avond-reserve · hysterese · piekgrens · schakeltijden · Alfen-minima · OCPP-verbod · handel-slot. Gevuld in N1b.",
+        "info": "N1b — Teo's eisen als zichtbare blokken. Input = contract sensor.ems_node_red_ems_plan_*; elke stap perkt alleen in. Output = veilig setpoint → tab Actuatoren (via link).",
         "env": []
     },
     {
-        "id": "tab_act",
+        "id": "tab_act_n1b",
         "type": "tab",
         "label": "3 · Actuatoren",
         "disabled": false,
-        "info": "Node-RED → Huawei / Alfen. Gevuld in N1b (Huawei) en N2 (Alfen).",
+        "info": "N1b — Huawei-actuator. Alles achter input_boolean.ems_node_red_stuurt. Alfen volgt in N2.",
         "env": []
     },
     {
@@ -885,6 +885,121 @@
         "debugEnabled": false
     },
     {
+        "id": "cfg0113",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS guardrail status",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS guardrail status"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:shield-check"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": ""
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0124",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "sa EMS laatste actie",
+        "version": "6",
+        "entityType": "sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS laatste actie"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:robot-outline"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            },
+            {
+                "property": "unit_of_measurement",
+                "value": ""
+            },
+            {
+                "property": "state_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
+        "id": "cfg0126",
+        "type": "ha-entity-config",
+        "server": "ems_ha_server",
+        "deviceConfig": "ems_device",
+        "name": "ba EMS stuurt actief",
+        "version": "6",
+        "entityType": "binary_sensor",
+        "haConfig": [
+            {
+                "property": "name",
+                "value": "EMS stuurt actief"
+            },
+            {
+                "property": "icon",
+                "value": "mdi:robot"
+            },
+            {
+                "property": "entity_picture",
+                "value": ""
+            },
+            {
+                "property": "entity_category",
+                "value": ""
+            },
+            {
+                "property": "device_class",
+                "value": ""
+            }
+        ],
+        "resend": false,
+        "debugEnabled": false
+    },
+    {
         "id": "sf_h_fn",
         "type": "function",
         "z": "sf_hysterese",
@@ -1365,7 +1480,7 @@
         "type": "function",
         "z": "tab_regels",
         "name": "⑦ contract-mapping → ems_plan_*",
-        "func": "const e = msg.ems;\n// Batterijvermogen: + laden (net toegestaan) / − ontladen (assist naar EV) / 0 = auto (zelfconsumptie)\nlet batt_w = 0, modus = 'auto', reden = 'zelfconsumptie';\nif (e.netladen_gewenst)        { batt_w = 5000;  modus = 'laden';    reden = 'netladen: ' + e.netladen_reden; }\nelse if (e.assist_toegestaan && e.ev_modus === 'Zon + batterij' && e.ev_doelstroom > 0)\n                               { batt_w = -e.assist_w; modus = 'ontladen'; reden = 'batterij→EV, ' + e.fase_tekst; }\nelse                           { reden = 'auto — ' + e.fase_tekst; }\n// horizon: gekozen laadblokken + herstelblokken als slots\nconst horizon = [...(e.blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: 5000, ev_A: 0, prijs: b.gem, bron: 'prijssturing' })),\n                 ...(e.herstel_blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: 5000, ev_A: 0, prijs: b.gem, bron: 'herstel' }))]\n  .sort((x, y) => Date.parse(x.start) - Date.parse(y.start));\n// verwachte kost van het plan (alleen netladen-slots, 5 kW × uren × prijs) — K9-basis\nconst kost = horizon.reduce((s, h) => s + 5 * ((Date.parse(h.end) - Date.parse(h.start)) / 3600e3) * (h.prijs || 0), 0); \nmsg.plan = {\n  batterij_vermogen: batt_w, modus, reden, horizon, kost_verwacht: Math.round(kost * 100) / 100,\n  ev_stroom: e.ev_doelstroom, bron: 'regels',\n  // pariteit / debug\n  netladen_gewenst: e.netladen_gewenst, netladen_reden: e.netladen_reden,\n  assist_toegestaan: e.assist_toegestaan, fase_tekst: e.fase_tekst,\n  herstel_nodig: e.herstel_nodig, herstel_uren: e.herstel_uren, herstel_venster: e.herstel_venster,\n  goedkoopste_uren: e.goedkoopste_uren, blokken: e.blokken, soc: e.soc,\n};\nflow.set('planner_prev', { herstel_nodig: e.herstel_nodig, netladen_gewenst: e.netladen_gewenst, assist_toegestaan: e.assist_toegestaan });\nglobal.set('ems_plan_regels', msg.plan);\nreturn msg;",
+        "func": "const e = msg.ems;\nconst NET_W = 3000;   // max laadvermogen van het net (omvormer-grens)\n// Batterijvermogen: + laden (net toegestaan) / − ontladen (assist naar EV) / 0 = auto (zelfconsumptie)\nlet batt_w = 0, modus = 'auto', reden = 'zelfconsumptie';\nif (e.netladen_gewenst)        { batt_w = NET_W;  modus = 'laden';    reden = 'netladen: ' + e.netladen_reden; }\nelse if (e.assist_toegestaan && e.ev_modus === 'Zon + batterij' && e.ev_doelstroom > 0)\n                               { batt_w = -e.assist_w; modus = 'ontladen'; reden = 'batterij→EV, ' + e.fase_tekst; }\nelse                           { reden = 'auto — ' + e.fase_tekst; }\n// horizon: gekozen laadblokken + herstelblokken als slots\nconst horizon = [...(e.blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: NET_W, ev_A: 0, prijs: b.gem, bron: 'prijssturing' })),\n                 ...(e.herstel_blokken || []).map(b => ({ start: b.start, end: b.end, batt_W: NET_W, ev_A: 0, prijs: b.gem, bron: 'herstel' }))]\n                .sort((x, y) => Date.parse(x.start) - Date.parse(y.start));\n// verwachte kost van het plan (alleen netladen-slots, 3 kW × uren × prijs) — K9-basis\nconst kost = horizon.reduce((s, h) => s + (NET_W / 1000) * ((Date.parse(h.end) - Date.parse(h.start)) / 3600e3) * (h.prijs || 0), 0);\nmsg.plan = {\n  batterij_vermogen: batt_w, modus, reden, horizon, kost_verwacht: Math.round(kost * 100) / 100,\n  ev_stroom: e.ev_doelstroom, bron: 'regels',\n  // pariteit / debug\n  netladen_gewenst: e.netladen_gewenst, netladen_reden: e.netladen_reden,\n  assist_toegestaan: e.assist_toegestaan, fase_tekst: e.fase_tekst,\n  herstel_nodig: e.herstel_nodig, herstel_uren: e.herstel_uren, herstel_venster: e.herstel_venster,\n  goedkoopste_uren: e.goedkoopste_uren, blokken: e.blokken, soc: e.soc,\n};\nflow.set('planner_prev', { herstel_nodig: e.herstel_nodig, netladen_gewenst: e.netladen_gewenst, assist_toegestaan: e.assist_toegestaan });\nglobal.set('ems_plan_regels', msg.plan);\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
@@ -1672,54 +1787,590 @@
         "wires": []
     },
     {
-        "id": "cm0065",
+        "id": "cm0101",
         "type": "comment",
-        "z": "tab_guard",
-        "name": "Guardrails — gevuld in N1b",
-        "info": "Volgorde (elke stap perkt alleen in): 1 vloer · 2 avond-reserve · 3 hysterese (subflow) · 4 piekgrens ems_piekgrens_kw · 5 min. schakeltijd batterij (subflow, 5 min) · 6 Alfen start/stop-minima (N2) · 7 OCPP-verbod · 8 handel-slot. Input = sensor.ems_plan_* ; output = veilig setpoint → tab Actuatoren.",
-        "x": 200,
+        "z": "tab_guard_n1b",
+        "name": "2 · Guardrails — volgorde: context → 🔁 vloer-latch → ① vloer → ② avond-reserve → ③ EV-pauze → ④ piekgrens → ⑤ netladen-bewaker → ⑥ setpoint → ⏱️ schakeltijd → link naar Actuatoren",
+        "info": "Elke minuut. Leest het contract uit HA (planner-agnostisch: werkt straks ook voor EMHASS). msg.g = werkcontext, msg.sp = setpoint, msg.sp.log = wat elke guardrail deed.",
+        "x": 520,
         "y": 40,
         "wires": []
     },
     {
-        "id": "sfi0066",
+        "id": "fn0102",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "context + contract inlezen",
+        "func": "const lib = global.get('ems_lib'); const st = lib.states();\n// ---- bronnen (één plek) ----\nconst SRC = {\n  plan_batt:   'sensor.ems_node_red_ems_plan_batterij_vermogen',\n  plan_ev:     'sensor.ems_node_red_ems_plan_ev_stroom',\n  soc:         'sensor.batterijen_batterijpercentage',\n  netafname:   'sensor.ems_node_red_ems_netafname',        // W, DTSU → later P1\n  ev_mode3:    'sensor.laadpaal_mode3_state_socket_1',     // STATE_A/B/C (C = laadt) — id verifiëren\n  ev_power:    'sensor.laadpaal_active_power_total_socket_1',\n  batt_power:  'sensor.batterijen_laad_ontlaad_vermogen',   // W, + = laden, − = ontladen\n};\nconst nu = new Date();\nconst g = {\n  nu,\n  batt_w:  lib.num(st, SRC.plan_batt, 0),\n  modus:   lib.attr(st, SRC.plan_batt, 'modus', 'auto'),\n  reden:   lib.attr(st, SRC.plan_batt, 'reden', ''),\n  bron:    lib.attr(st, SRC.plan_batt, 'bron', '?'),\n  ev_a:    lib.num(st, SRC.plan_ev, 0),\n  soc:     lib.num(st, SRC.soc, 100),\n  vloer:   lib.num(st, 'input_number.batterij_vloer', 40),\n  marge:   lib.num(st, 'input_number.ems_hysterese_marge', 5),\n  avond:   lib.todayAt(lib.str(st, 'input_datetime.avond_reserve_tijd', '19:00:00'), nu),\n  deadline: lib.todayAt(lib.str(st, 'input_datetime.herstel_deadline', '15:00:00'), nu),\n  piek_kw: lib.num(st, 'input_number.ems_piekgrens_kw', 4.0),\n  netafname: lib.num(st, SRC.netafname, 0),\n  batt_nu:   lib.num(st, SRC.batt_power, 0),\n  ev_laadt: lib.str(st, SRC.ev_mode3, 'STATE_A').toUpperCase().includes('C'),\n  ev_w:    lib.num(st, SRC.ev_power, 0),\n  assist_ok: lib.on(st, 'binary_sensor.ems_node_red_ems_nr_batterij_assist_toegestaan'),\n  master:  lib.on(st, 'input_boolean.ems_node_red_stuurt'),\n};\n// setpoint start = het contract, ongewijzigd; guardrails perken in\nmsg.sp = { modus: g.modus, batt_w: g.batt_w, log: [], bron: g.bron, reden_plan: g.reden };\nmsg.g = g;\nmsg.payload = g.soc;   // → 🔁 vloer-latch\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 120,
+        "wires": [
+            [
+                "sfi0103"
+            ]
+        ]
+    },
+    {
+        "id": "sfi0103",
         "type": "subflow:sf_hysterese",
-        "z": "tab_guard",
-        "name": "voorbeeld: SOC boven meepomp-grens",
+        "z": "tab_guard_n1b",
+        "name": "🔁 SOC boven vloer (hysterese)",
         "env": [
             {
                 "name": "GRENS",
-                "value": "input_number.batterij_meepomp_grens",
+                "value": "input_number.batterij_vloer",
+                "type": "str"
+            },
+            {
+                "name": "RICHTING",
+                "value": "boven",
                 "type": "str"
             }
         ],
+        "x": 720,
+        "y": 120,
+        "wires": [
+            [
+                "fn0104"
+            ]
+        ]
+    },
+    {
+        "id": "fn0104",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "① vloer",
+        "func": "const g = msg.g, sp = msg.sp;\n// msg.payload = uitkomst 🔁 latch: true = SOC boven vloer (met hysterese)\ng.boven_vloer = !!msg.payload;\nif (!g.boven_vloer && sp.batt_w < 0) { sp.batt_w = 0; sp.modus = 'auto'; sp.log.push(`① vloer: SOC ${g.soc}% ≤ ${g.vloer}% → geen ontladen`); }\nelse if (!g.boven_vloer)             { sp.log.push(`① vloer: SOC ${g.soc}% onder vloer (ontladen was al niet gepland)`); }\nnode.status({ fill: g.boven_vloer ? 'green' : 'yellow', shape: 'dot', text: `SOC ${g.soc}% ${g.boven_vloer ? '>' : '≤'} vloer ${g.vloer}%` });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 200,
+        "wires": [
+            [
+                "fn0105"
+            ]
+        ]
+    },
+    {
+        "id": "fn0105",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "② avond-reserve",
+        "func": "const g = msg.g, sp = msg.sp;\ng.na_avond = g.nu >= g.avond;\nif (g.na_avond && sp.batt_w < 0) { sp.batt_w = 0; sp.modus = 'auto'; sp.log.push('② avond-reserve: na ' + g.avond.toTimeString().slice(0,5) + ' geen batterij→EV'); }\nnode.status({ fill: g.na_avond ? 'yellow' : 'green', shape: 'dot', text: g.na_avond ? 'avond-reserve actief' : 'dag' });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 260,
+        "wires": [
+            [
+                "fn0106"
+            ]
+        ]
+    },
+    {
+        "id": "fn0106",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "③ EV-pauze (geen batterij→EV)",
+        "func": "const g = msg.g, sp = msg.sp;\n// EV-pauze: auto laadt en batterij-assist is NIET toegestaan (fase 1/3 of onder meepomp-grens)\n// → batterij vasthouden (max ontlaadvermogen 0) zodat de auto niet uit de batterij laadt.\n// Alleen als er niet van het net geladen wordt (laden heeft voorrang).\nif (g.ev_laadt && !g.assist_ok && sp.modus !== 'laden') {\n  sp.modus = 'vasthouden'; sp.batt_w = 0;\n  sp.log.push(`③ EV-pauze: auto laadt (${g.ev_w} W), assist niet toegestaan → batterij vasthouden`);\n  node.status({ fill: 'yellow', shape: 'dot', text: 'EV laadt → vasthouden' });\n} else {\n  node.status({ fill: 'green', shape: 'dot', text: g.ev_laadt ? 'EV laadt, assist ok' : 'EV laadt niet' });\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 320,
+        "wires": [
+            [
+                "fn0107"
+            ]
+        ]
+    },
+    {
+        "id": "fn0107",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "④ piekgrens (capaciteitstarief)",
+        "func": "const g = msg.g, sp = msg.sp;\n// Piekgrens (capaciteitstarief): netafname nu + extra netladen mag de grens niet overschrijden.\n// Netafname is DTSU-vervuild tot stap M → tot dan alleen inperken op de grens zelf (conservatief).\nconst grens_w = Math.round(g.piek_kw * 1000);\n// netafname ZONDER het huidige batterij-laden (anders schakelt de grens zichzelf uit zodra het laden start)\ng.net_excl_batt = Math.max(g.netafname - Math.max(g.batt_nu, 0), 0);\nif (sp.batt_w > 0) {\n  const ruimte = grens_w - g.net_excl_batt;\n  if (ruimte < 500) { sp.log.push(`④ piekgrens: netafname ${g.net_excl_batt} W (excl. batterij) laat < 500 W ruimte onder ${grens_w} W → netladen uit`); sp.batt_w = 0; sp.modus = 'auto'; }\n  else if (sp.batt_w > ruimte) { sp.log.push(`④ piekgrens: netladen ${sp.batt_w} → ${Math.floor(ruimte/100)*100} W (grens ${grens_w} W)`); sp.batt_w = Math.floor(ruimte / 100) * 100; }\n}\nnode.status({ fill: 'green', shape: 'dot', text: `net ${g.net_excl_batt} W (excl. batt) / grens ${grens_w} W` });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 380,
+        "wires": [
+            [
+                "fn0108"
+            ]
+        ]
+    },
+    {
+        "id": "fn0108",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "⑤ netladen-bewaker",
+        "func": "const g = msg.g, sp = msg.sp;\n// Netladen-bewaker (vervangt HA-automatisering \"Batterij — netladen bewaken\"):\n// de switch mag ALLEEN aan als het setpoint 'laden' is met vermogen > 0. Alles anders → uit.\nsp.switch_netladen = (sp.modus === 'laden' && sp.batt_w > 0);\nif (sp.modus === 'laden' && sp.batt_w <= 0) { sp.modus = 'auto'; sp.log.push('⑤ bewaker: laden zonder vermogen → auto'); }\nif (!sp.switch_netladen) sp.log.push('⑤ bewaker: netladen-switch UIT');\nelse sp.log.push(`⑤ bewaker: netladen-switch AAN (${sp.batt_w} W)`);\nnode.status({ fill: sp.switch_netladen ? 'blue' : 'green', shape: 'dot', text: sp.switch_netladen ? 'switch AAN' : 'switch uit' });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 440,
+        "wires": [
+            [
+                "fn0109"
+            ]
+        ]
+    },
+    {
+        "id": "fn0109",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "⑥ Huawei-setpoint",
+        "func": "const g = msg.g, sp = msg.sp;\n// Vertaling naar Huawei-setpoint. Grenzen van de omvormer: netladen ≤ 3000 W, ontladen ≤ 5000 W.\nconst MAX_NET_W = 3000, MAX_ONTLAAD_W = 5000;\nif (sp.modus === 'laden')       { sp.laad_net_w = Math.min(Math.max(sp.batt_w, 0), MAX_NET_W); sp.ontlaad_w = MAX_ONTLAAD_W; sp.helper_modus = 'Net laden toestaan'; }\nelse if (sp.modus === 'vasthouden') { sp.laad_net_w = MAX_NET_W; sp.ontlaad_w = 0; sp.helper_modus = 'Vasthouden'; }\nelse                            { sp.modus = 'auto'; sp.laad_net_w = MAX_NET_W; sp.ontlaad_w = MAX_ONTLAAD_W; sp.helper_modus = 'Auto'; }\n// ontladen-assist (contract < 0) = gewoon 'auto' met vol ontlaadvermogen; Huawei zelfconsumptie doet de rest\nif (sp.batt_w < 0) sp.log.push(`⑥ assist ${-sp.batt_w} W → auto (zelfconsumptie, vol ontlaadvermogen)`);\nsp.reden = sp.log.length ? sp.log[sp.log.length - 1] : ('plan: ' + sp.reden_plan);\nsp.master = g.master;\nsp.key = `${sp.modus}|${sp.laad_net_w}|${sp.ontlaad_w}`;\nglobal.set('ems_setpoint', sp);\nmsg.payload = sp.key;   // → ⏱️ schakeltijd-bewaker (alleen wijzigingen ≥ 5 min)\nmsg.sp_tekst = `${sp.modus} · net ${sp.laad_net_w} W · ontlaad ${sp.ontlaad_w} W · switch ${sp.switch_netladen ? 'aan' : 'uit'}`;\nnode.status({ fill: 'green', shape: 'dot', text: msg.sp_tekst });\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 500,
+        "wires": [
+            [
+                "sfi0110"
+            ]
+        ]
+    },
+    {
+        "id": "sfi0110",
+        "type": "subflow:sf_schakeltijd",
+        "z": "tab_guard_n1b",
+        "name": "⏱️ modus ≥ 5 min",
+        "env": [
+            {
+                "name": "MIN_MINUTEN",
+                "value": "5",
+                "type": "num"
+            }
+        ],
+        "x": 720,
+        "y": 500,
+        "wires": [
+            [
+                "lo0112",
+                "sen0114"
+            ],
+            [
+                "fn0111"
+            ]
+        ]
+    },
+    {
+        "id": "fn0111",
+        "type": "function",
+        "z": "tab_guard_n1b",
+        "name": "geblokkeerd → status",
+        "func": "msg.sp.wacht_s = msg.wacht_s;\nmsg.sp_tekst = `wacht ${msg.wacht_s}s: ${msg.sp.modus}`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 960,
+        "y": 560,
+        "wires": [
+            [
+                "sen0114"
+            ]
+        ]
+    },
+    {
+        "id": "lo0112",
+        "type": "link out",
+        "z": "tab_guard_n1b",
+        "name": "→ Actuatoren",
+        "mode": "link",
+        "links": [
+            "li0118"
+        ],
+        "x": 1000,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "sen0114",
+        "type": "ha-sensor",
+        "z": "tab_guard_n1b",
+        "name": "EMS guardrail status",
+        "entityConfig": "cfg0113",
+        "version": 0,
+        "state": "sp.modus",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "setpoint",
+                "value": "sp_tekst",
+                "valueType": "msg"
+            },
+            {
+                "property": "log",
+                "value": "sp.log",
+                "valueType": "msg"
+            },
+            {
+                "property": "switch_netladen",
+                "value": "sp.switch_netladen",
+                "valueType": "msg"
+            },
+            {
+                "property": "laad_net_w",
+                "value": "sp.laad_net_w",
+                "valueType": "msg"
+            },
+            {
+                "property": "ontlaad_w",
+                "value": "sp.ontlaad_w",
+                "valueType": "msg"
+            },
+            {
+                "property": "bron",
+                "value": "sp.bron",
+                "valueType": "msg"
+            },
+            {
+                "property": "reden",
+                "value": "sp.reden",
+                "valueType": "msg"
+            },
+            {
+                "property": "wacht_s",
+                "value": "sp.wacht_s",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 1000,
+        "y": 620,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "inj0115",
+        "type": "inject",
+        "z": "tab_guard_n1b",
+        "name": "elke 60 s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "60",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "20",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 120,
+        "wires": [
+            [
+                "fn0102"
+            ]
+        ]
+    },
+    {
+        "id": "cm0116",
+        "type": "comment",
+        "z": "tab_guard_n1b",
+        "name": "⑦ OCPP-verbod · ⑧ handel-slot",
+        "info": "⑦ Alfen: de actuator (N2) raakt uitsluitend number.laadpaal_max_station_current aan — alle andere Alfen-entiteiten zijn read-only. ⑧ Handel (forcible discharge naar net) is NIET geïmplementeerd tot K6 positief is (stap H); contract < 0 wordt hier altijd 'auto' (assist via zelfconsumptie).",
+        "x": 520,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "cm0117",
+        "type": "comment",
+        "z": "tab_act_n1b",
+        "name": "3 · Actuatoren — Huawei (N1b)",
+        "info": "Ontvangt het veilige setpoint via link. Master input_boolean.ems_node_red_stuurt UIT → alleen publiceren wat hij ZOU doen. AAN → service-calls, alleen bij wijziging (+ herhaal elke 15 min als bewaking). Alfen komt in N2.",
+        "x": 300,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "li0118",
+        "type": "link in",
+        "z": "tab_act_n1b",
+        "name": "← Guardrails",
+        "links": [
+            "lo0112"
+        ],
+        "x": 120,
+        "y": 120,
+        "wires": [
+            [
+                "fn0119"
+            ]
+        ]
+    },
+    {
+        "id": "fn0119",
+        "type": "function",
+        "z": "tab_act_n1b",
+        "name": "master aan? wijziging?",
+        "func": "const sp = msg.sp;\nconst nu = Date.now();\nconst last = context.get('last') || { key: null, t: 0 };\nconst veranderd = sp.key !== last.key;\nconst herhaal = nu - last.t > 15 * 60e3;          // bewaking: elk kwartier opnieuw afdwingen\nmsg.zou_doen = sp.helper_modus + ' · switch ' + (sp.switch_netladen ? 'aan' : 'uit') + ` · net ${sp.laad_net_w} W · ontlaad ${sp.ontlaad_w} W`;\nif (!sp.master) { node.status({ fill: 'grey', shape: 'ring', text: 'master UIT — zou doen: ' + sp.helper_modus }); msg.actief = false; msg.actie = 'master uit — geen sturing'; return [null, msg]; }\nif (!veranderd && !herhaal) { node.status({ fill: 'green', shape: 'dot', text: 'ongewijzigd: ' + sp.helper_modus }); return [null, null]; }\ncontext.set('last', { key: sp.key, t: nu });\nmsg.actief = true; msg.actie = (veranderd ? 'wijziging' : 'kwartier-herhaling') + ' → ' + msg.zou_doen;\nnode.status({ fill: 'blue', shape: 'dot', text: msg.actie });\nreturn [msg, msg];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
         "x": 380,
+        "y": 120,
+        "wires": [
+            [
+                "fn0120",
+                "sen0125",
+                "bse0127"
+            ],
+            [
+                "sen0125",
+                "bse0127"
+            ]
+        ]
+    },
+    {
+        "id": "fn0120",
+        "type": "function",
+        "z": "tab_act_n1b",
+        "name": "service-calls opbouwen",
+        "func": "const sp = msg.sp;\n// Eén msg per service-call; velden per nieuwe websocket-palette (action + target + data).\nconst calls = [\n  { action: 'input_select.select_option', target: { entity_id: ['input_select.batterij_modus'] }, data: { option: sp.helper_modus } },\n  { action: 'number.set_value', target: { entity_id: ['number.omvormer_maximum_ontlaadvermogen'] }, data: { value: sp.ontlaad_w } },\n  { action: 'number.set_value', target: { entity_id: ['number.omvormer_maximum_laadvermogen_van_stroomnet'] }, data: { value: sp.laad_net_w } },\n  { action: sp.switch_netladen ? 'switch.turn_on' : 'switch.turn_off', target: { entity_id: ['switch.batterijen_laden_van_stroomnet'] } },\n];\nreturn [calls.map(c => ({ payload: c, sp }))];",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 120,
+        "wires": [
+            [
+                "spl0121"
+            ]
+        ]
+    },
+    {
+        "id": "spl0121",
+        "type": "split",
+        "z": "tab_act_n1b",
+        "name": "één per call",
+        "splt": "\\n",
+        "spltType": "str",
+        "arraySplt": 1,
+        "arraySpltType": "len",
+        "stream": false,
+        "addname": "",
+        "x": 850,
+        "y": 120,
+        "wires": [
+            [
+                "dly0123"
+            ]
+        ]
+    },
+    {
+        "id": "svc0122",
+        "type": "api-call-service",
+        "z": "tab_act_n1b",
+        "name": "Huawei → HA",
+        "server": "ems_ha_server",
+        "version": 7,
+        "debugenabled": false,
+        "action": "",
+        "floorId": [],
+        "areaId": [],
+        "deviceId": [],
+        "entityId": [],
+        "labelId": [],
+        "data": "",
+        "dataType": "jsonata",
+        "mergeContext": "",
+        "outputProperties": [],
+        "queue": "none",
+        "blockInputOverrides": false,
+        "domain": "",
+        "service": "",
+        "x": 1060,
         "y": 120,
         "wires": [
             []
         ]
     },
     {
-        "id": "sfi0067",
-        "type": "subflow:sf_schakeltijd",
-        "z": "tab_guard",
-        "name": "voorbeeld: batterij-modus ≥ 5 min",
-        "x": 380,
+        "id": "dly0123",
+        "type": "delay",
+        "z": "tab_act_n1b",
+        "name": "1/s",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 950,
         "y": 180,
         "wires": [
-            [],
+            [
+                "svc0122"
+            ]
+        ]
+    },
+    {
+        "id": "sen0125",
+        "type": "ha-sensor",
+        "z": "tab_act_n1b",
+        "name": "EMS laatste actie",
+        "entityConfig": "cfg0124",
+        "version": 0,
+        "state": "actie",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "zou_doen",
+                "value": "zou_doen",
+                "valueType": "msg"
+            },
+            {
+                "property": "modus",
+                "value": "sp.helper_modus",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 660,
+        "y": 240,
+        "wires": [
             []
         ]
     },
     {
-        "id": "cm0069",
+        "id": "bse0127",
+        "type": "ha-binary-sensor",
+        "z": "tab_act_n1b",
+        "name": "EMS stuurt actief",
+        "entityConfig": "cfg0126",
+        "version": 0,
+        "state": "actief",
+        "stateType": "msg",
+        "attributes": [
+            {
+                "property": "zou_doen",
+                "value": "zou_doen",
+                "valueType": "msg"
+            }
+        ],
+        "inputOverride": "allow",
+        "outputProperties": [],
+        "x": 660,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cm0128",
         "type": "comment",
-        "z": "tab_act",
-        "name": "Actuatoren — N1b (Huawei) en N2 (Alfen)",
-        "info": "Huawei: input_select.batterij_modus (→ bestaande bewaker) / switch.batterijen_laden_van_stroomnet, number.batterijen_maximaal_laadvermogen / _ontlaadvermogen, huawei_solar.forcible_charge/discharge. Alfen: ALLEEN number.laadpaal_max_station_current (guardrail 7). Alles achter input_boolean.ems_nodered_stuurt.",
-        "x": 200,
-        "y": 40,
+        "z": "tab_act_n1b",
+        "name": "Handmatig test-inject (alleen als master AAN)",
+        "info": "Schakel de inject hieronder alleen in om één keer het huidige setpoint te forceren; normaal loopt alles via de guardrails-tab.",
+        "x": 300,
+        "y": 400,
         "wires": []
+    },
+    {
+        "id": "inj0129",
+        "type": "inject",
+        "z": "tab_act_n1b",
+        "name": "forceer huidig setpoint",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "20",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 460,
+        "wires": [
+            [
+                "fn0130"
+            ]
+        ]
+    },
+    {
+        "id": "fn0130",
+        "type": "function",
+        "z": "tab_act_n1b",
+        "name": "sp uit global",
+        "func": "msg.sp = global.get('ems_setpoint'); if (!msg.sp) return null; msg.sp.key = 'force-' + Date.now(); return msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 460,
+        "wires": [
+            [
+                "fn0119"
+            ]
+        ]
     },
     {
         "id": "cm0070",
@@ -1833,7 +2484,7 @@
         "type": "function",
         "z": "tab_systeem",
         "name": "payload = set_datetime(nu)",
-        "func": "const d = new Date();\nconst p = n => String(n).padStart(2, '0');\nconst lokaal = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;\nmsg.payload = {\n  action: 'input_datetime.set_datetime',\n  domain: 'input_datetime', service: 'set_datetime',\n  target: { entity_id: ['input_datetime.ems_heartbeat'] },\n  data: { datetime: lokaal }\n};\nreturn msg;",
+        "func": "const d = new Date();\nconst p = n => String(n).padStart(2, '0');\nconst lokaal = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;\nmsg.payload = {\n  action: 'input_datetime.set_datetime',\n  target: { entity_id: ['input_datetime.ems_heartbeat'] },\n  data: { datetime: lokaal }\n};\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
